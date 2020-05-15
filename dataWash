@@ -1,0 +1,68 @@
+import numpy
+import pandas as pd
+from pandas import Series,DataFrame
+
+#读取数据
+df = DataFrame(pd.read_excel("数据清理.xlsx"))
+
+#删除指定列
+df.drop(columns=[0],inplace = True)
+
+#替换列名称
+df.rename(columns = {1 : 'names',2: 'ages',3 : 'weights',4 : 'm0006',5 : 'm0612',6 : 'm1218',7 : 'f0006',8: 'f0612',9 : 'f1218'},inplace = True)
+
+#删除全空行
+df.dropna(how='all',inplace=True)
+
+#对ages列用出现次数最多的数据进行补全
+ages_maxf = df['ages'].value_counts().index[0]
+df['ages'].fillna(ages_maxf,inplace = True)
+
+#对weights列用出现次数最多的数据进行补全
+weights_maxf = df['weights'].value_counts().index[0]
+df['weights'].fillna(weights_maxf,inplace = True)
+
+#获取weights列以磅为单位的数据
+columns_with_lbs = df['weights'].str.contains('lbs').fillna(False)
+#print (df[columns_with_lbs])
+#将lbs转换为kgs，2.2lbs=1kgs
+for i,lbs_column in df[columns_with_lbs].iterrows():
+    #截取从头开始到倒数第三个字符之前，即去掉lbs
+    weights = int(float(lbs_column['weights'][:-3])/2.2)
+    df.at[i,'weights'] = '{}kgs'.format(weights)
+
+#切分名字，删除源数据列
+df[['first_name','last_name']] = df['names'].str.split(expand = True)
+df.drop('names',axis = 1,inplace=True)
+
+#删除重复数据行
+df.drop_duplicates(['first_name','last_name'],inplace=True)
+
+#交互列
+columns = list(df)
+columns.insert(0,columns.pop(columns.index('last_name')))
+columns = ['last_name', 'ages', 'weights', 'm0006', 'm0612', 'm1218', 'f0006', 'f0612', 'f1218', 'first_name']
+columns.insert(0,columns.pop(columns.index('first_name')))
+columns = numpy.array(columns)
+df = df.loc[:,columns]
+
+#过滤出有数值的列数据
+f0612_rows = df['f0612'].str.isalnum().fillna(True)  #isalnum() 方法检测字符串是否由字母和数字组成。
+#print(f0612_rows)
+#print(df[f0612_rows])
+
+f0612_mean = df[f0612_rows]['f0612'].mean()
+#print(f0612_mean)
+
+#进行数值补全
+df['f0612'].fillna(f0612_mean,inplace=True)
+#print(df)
+df.replace('——','',inplace=True)  #.replace() 方法把字符串中的 old（旧字符串） 替换成 new(新字符串)，如果指定第三个参数max，则替换不超过 max 次
+#str.replace(old, new[, max])
+#print(df)
+
+#求取数值数量，并自动生成索引
+df.reindex(range(df.shape[0]),method = 'bfill')
+
+df.to_excel("数据清洗后.xlsx")  #导出到Excel中
+print(df)
